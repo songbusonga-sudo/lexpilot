@@ -1,0 +1,10 @@
+from pathlib import Path
+p=Path('src/components/CaseTools.vue');s=p.read_text(encoding='utf-8')
+s=s.replace('@click="eventOpen=!eventOpen"','@click="event=eventEmpty();eventOpen=!eventOpen"')
+s=s.replace('@click="workOpen=!workOpen"','@click="work=workEmpty();workOpen=!workOpen"')
+s=s.replace('<h3>添加事件</h3>','<h3>{{event.id ? \'编辑事件\' : \'添加事件\'}}</h3>')
+s=s.replace('<h3>登记一段工作</h3>','<h3>{{work.id ? \'编辑工作记录\' : \'登记一段工作\'}}</h3>')
+s=s.replace('<button v-if="ev.kind===\'event\'" class="icon-button"','<button v-if="ev.kind===\'event\'" class="text-button" @click="editEvent(ev)">编辑事件</button><button v-if="ev.kind===\'event\'" class="icon-button"')
+s=s.replace('<button class="icon-button" aria-label="删除工作记录"','<button class="text-button" @click="editWork(r)">编辑工作记录</button><button class="icon-button" aria-label="删除工作记录"')
+s=s.replace('const cell=v=>\'"\'+String(v??\'\').replaceAll', '''const cell=v=>'"'+String((typeof v==='string' && /^[=+@\\-\\t\\r]/.test(v)) ? "'"+v : (v??'')).replaceAll''')
+p.write_text(s,encoding='utf-8')

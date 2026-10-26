@@ -1,0 +1,71 @@
+{
+  "input": "D:\\projects\\lexpilot\\.work\\proposal\\reference.docx",
+  "fonts_by_char_count": {
+    "Times New Roman": 1314,
+    "\u65b9\u6b63\u5c0f\u6807\u5b8b_GBK": 10,
+    "\u65b9\u6b63\u9ed1\u4f53_GBK": 6
+  },
+  "direct_run_formatting_runs": 187,
+  "direct_paragraph_formatting_paragraphs": 25,
+  "heading_like_paragraphs_not_heading_style": [],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "\u9644\u4ef6",
+        "style": "Normal"
+      },
+      {
+        "para_index": 1,
+        "run_text": "2",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "2026",
+        "style": "Title"
+      },
+      {
+        "para_index": 3,
+        "run_text": "\u5e74\u4e2d\u56fd\uff08\u5e7f\u897f\uff09",
+        "style": "Title"
+      },
+      {
+        "para_index": 3,
+        "run_text": "\u2014",
+        "style": "Title"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 2,
+        "text": "",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "2026\u5e74\u4e2d\u56fd\uff08\u5e7f\u897f\uff09\u2014\u4e1c\u76df\u201cAI+\u6cd5\u5f8b\u201d",
+        "style": "Title"
+      },
+      {
+        "para_index": 14,
+        "text": "\u586b\u5199\u8bf4\u660e",
+        "style": "Normal"
+      },
+      {
+        "para_index": 16,
+        "text": "\u4e00\u3001\u8bf7\u5982\u5b9e\u3001\u5b8c\u6574\u586b\u5199\u5404\u9879\u5185\u5bb9\uff0c\u4e0d\u5f97\u7a7a\u9879\u3001\u6f0f\u9879\u3002\u5982\u786e\u65e0\u76f8\u5173\u5185\u5bb9\uff0c\u8bf7\u586b\u5199\u201c\u65e0\u201d\u3002",
+        "style": "Normal"
+      },
+      {
+        "para_index": 17,
+        "text": "\u4e8c\u3001\u7533\u62a5\u6750\u6599\u5e94\u5ba2\u89c2\u3001\u771f\u5b9e\uff0c\u5c0a\u91cd\u4ed6\u4eba\u77e5\u8bc6\u4ea7\u6743\uff0c\u9075\u5b88\u56fd\u5bb6\u6709\u5173\u6cd5\u5f8b\u6cd5\u89c4\u3002\u6d89\u53ca\u4f7f\u7528\u7b2c\u4e09\u65b9\u6570\u636e\u3001\u4ee3\u7801\u6216\u6a21\u578b\u7684\uff0c\u987b\u5728\u7533\u62a5\u4e66\u4e2d\u660e\u786e\u6807\u6ce8\u6765\u6e90\u5e76\u8bf4\u660e\u4f7f\u7528\u6388\u6743\u60c5\u51b5\u3002",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

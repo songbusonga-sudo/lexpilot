@@ -1,0 +1,66 @@
+{
+  "[Content_Types].xml": {
+    "size": 1957,
+    "sha256": "ec5bf70cddf88a4e2a85636f99937ba7fd7d65dd3dc2b7b3d81b130e72746cb0"
+  },
+  "_rels/.rels": {
+    "size": 737,
+    "sha256": "c30fe099dbcfed4ecc4ae544ccf82f432c8d3bb665e2a301df283738b196d803"
+  },
+  "word/_rels/document.xml.rels": {
+    "size": 1337,
+    "sha256": "b9d628d3747b5dbaab225dfcf5a8d79a7f1009cb1031e05b6bbc47bc19b54d29"
+  },
+  "word/document.xml": {
+    "size": 49873,
+    "sha256": "fb3dcdd3e9582a36ee079ef225b285da4159a7ef9cdb3cf75e4a9195b69cb26f"
+  },
+  "word/footnotes.xml": {
+    "size": 1650,
+    "sha256": "bb6a1f9af47d71543f2d6a071501116662ed13494cc53b57212f429e96f94d5f"
+  },
+  "word/endnotes.xml": {
+    "size": 1644,
+    "sha256": "44ae608c2921cbc00c31d3dee3d92fd4e815a02c98f5ccdc01b0bffe6dcb5448"
+  },
+  "word/footer1.xml": {
+    "size": 3265,
+    "sha256": "5989527ffb81ddb0a55bcfc3f5f8b36eb9ce4a85ce2b70ca87ec325a9df4864c"
+  },
+  "word/footer2.xml": {
+    "size": 3701,
+    "sha256": "83a76fc8675eda7f0fed991e14cadef459602db5cdf066ed1278194f44cf05cc"
+  },
+  "word/theme/theme1.xml": {
+    "size": 6804,
+    "sha256": "7d877a14a830a2ffc9d99c589395c10d3cc944b1bba3db0cf6b526db6aa65887"
+  },
+  "word/settings.xml": {
+    "size": 10630,
+    "sha256": "85c88cf4ff86a7faeeec0d59d24f8f2996e989f23aace34b5f869e9267744c2f"
+  },
+  "word/styles.xml": {
+    "size": 23497,
+    "sha256": "831d8b6f8284ab02e68f711db77ce9935273269199cfaf490f0a348a38def0ab"
+  },
+  "word/webSettings.xml": {
+    "size": 637,
+    "sha256": "59b0e87f9f00f42707856deb14db6fb04ad89a1e1aba40f3293b14ead16efe73"
+  },
+  "docProps/custom.xml": {
+    "size": 750,
+    "sha256": "f73d13acd2115d44421edba3060130b9c9379c7224f440824c11eb739b957f3c"
+  },
+  "docProps/app.xml": {
+    "size": 717,
+    "sha256": "2a1836b6f7f592cc26189388c696aac41ad4dc0ff1a42b062a4a1ab9422ae33a"
+  },
+  "docProps/core.xml": {
+    "size": 762,
+    "sha256": "b7dc5f594aacfdff092eac35fc968d64d304768a6af12c3154632a46a1fdd585"
+  },
+  "word/fontTable.xml": {
+    "size": 3853,
+    "sha256": "9b0af34e18f6329d8f4dd3be867f41e6b4a43d7979ec0157707c646a246b87f4"
+  }
+}

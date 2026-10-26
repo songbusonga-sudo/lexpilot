@@ -1,0 +1,32 @@
+{
+  "sections": [
+    {
+      "title": "一、项目概述（限2000字以内）",
+      "characters": 1009,
+      "limit": 2000
+    },
+    {
+      "title": "二、解决方案（限5000字以内）",
+      "characters": 2840,
+      "limit": 5000
+    },
+    {
+      "title": "三、先进性（限3000字以内）",
+      "characters": 1054,
+      "limit": 3000
+    },
+    {
+      "title": "四、应用推广（限3000字以内）",
+      "characters": 1075,
+      "limit": 3000
+    },
+    {
+      "title": "五、效益分析（限3000字以内）",
+      "characters": 1171,
+      "limit": 3000
+    }
+  ],
+  "only_document_xml_changed": true,
+  "source_unchanged": true,
+  "other_cover_fields_unchanged": true
+}
