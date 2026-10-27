@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createSessionFetch } from './session-fetch.mjs';
+const fetch = createSessionFetch();
 const base = "http://127.0.0.1:8266/api";
 const json = (method, body) => ({
   method,

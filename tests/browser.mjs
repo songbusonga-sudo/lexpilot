@@ -1,12 +1,14 @@
 import { chromium } from "@playwright/test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createSessionFetch } from './session-fetch.mjs';
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 const page = await browser.newPage({
   viewport: { width: 1440, height: 1080 },
   deviceScaleFactor: 1,
 });
 const errors = [];
+const fetch = createSessionFetch(page.context());
 page.on("pageerror", (e) => errors.push(e.message));
 let testId;
 const request = async (path, options) => {
@@ -45,7 +47,7 @@ try {
   );
   await shot("v2-citation-desktop.png");
   await page.getByRole("button", { name: "关闭材料" }).click();
-  await page.getByRole("button", { name: "返回我的事项" }).click();
+  await page.getByRole("button", { name: "返回我的记录" }).click();
   await page.getByRole("button", { name: "新建事项", exact: true }).click();
   const title = "界面流程验证-" + Date.now();
   await page.getByPlaceholder("例如：梧桐公寓退租押金核对").fill(title);

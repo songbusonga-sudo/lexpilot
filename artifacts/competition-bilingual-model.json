@@ -1,0 +1,53 @@
+{
+  "dataType": "fictional demo only",
+  "findings": [
+    {
+      "id": "46633d67-82ef-423f-9f3d-ea862fa73e83",
+      "title": "维修扣款明细与凭证缺失",
+      "description": "房东主张扣款800元，但尚未提供维修明细与凭证，无法核实扣款合理性。请要求房东书面提供维修清单、报价单及支付凭证。",
+      "quote": "【模拟】房东：墙面需要维修，扣款800元。租客：入住时已有旧痕，请提供维修明细与凭证。房东尚未提供。",
+      "materialId": "b6046055-d4d0-4125-82cb-110b0765f299",
+      "level": "需核实",
+      "origin": "模型辅助",
+      "priority": "优先核对",
+      "titleEn": "Missing repair itemization and vouchers for deduction",
+      "descriptionEn": "The landlord claims a deduction of 800 CNY but has not provided itemization or vouchers, making it impossible to verify the reasonableness of the deduction. Please request the landlord to provide a written repair list, quotation, and payment vouchers.",
+      "relatedMaterialId": "8e6526f5-f1ea-499a-80b5-6cda258eaac8",
+      "relatedQuote": "[SIMULATED] Security deposit: CNY 2,000. After inspection at the end of the tenancy, relevant charges may be deducted and the remaining deposit returned. Repair responsibility shall be discussed based on the actual circumstances. No refund deadline is specified."
+    },
+    {
+      "id": "33b634e8-ed5e-4ba6-8a10-772e18905cb5",
+      "title": "入住痕迹记录未双方签署",
+      "description": "入住记录记载了墙面旧痕，但未由双方签署，且明确说明不确立损坏原因。请确认该记录是否已补签，或要求房东承认入住时墙面状况。",
+      "quote": "[SIMULATED] Existing marks on the bedroom wall were noted at move-in. This record has not been signed by both parties. It does not establish the cause of any damage.",
+      "materialId": "1469a8e7-6023-4c52-aa2b-d5b03e173901",
+      "level": "需核实",
+      "origin": "模型辅助",
+      "priority": "建议核对",
+      "titleEn": "Move-in record not signed by both parties",
+      "descriptionEn": "The move-in record notes existing marks on the wall but is not signed by both parties and explicitly states it does not establish the cause of any damage. Please confirm whether this record has been countersigned, or request the landlord to acknowledge the wall condition at move-in."
+    },
+    {
+      "id": "84fa0dec-7364-450e-bef0-6a2ad2dca568",
+      "title": "押金退还日期未约定",
+      "description": "租赁协议未指定退款截止日期，导致退款时间不确定。请要求房东书面确认具体退款日期。",
+      "quote": "[SIMULATED] Security deposit: CNY 2,000. After inspection at the end of the tenancy, relevant charges may be deducted and the remaining deposit returned. Repair responsibility shall be discussed based on the actual circumstances. No refund deadline is specified.",
+      "materialId": "8e6526f5-f1ea-499a-80b5-6cda258eaac8",
+      "level": "需核实",
+      "origin": "模型辅助",
+      "priority": "建议核对",
+      "titleEn": "Refund deadline not specified",
+      "descriptionEn": "The rental agreement does not specify a refund deadline, making the refund timing uncertain. Please request the landlord to confirm the specific refund date in writing."
+    }
+  ],
+  "rejectedCount": 0,
+  "model": "Qwen/Qwen3.5-35B-A3B",
+  "at": "2026-10-27T04:17:59.283Z",
+  "sourceFingerprint": "675852d307dcb85c29ef245c6cf1932c423dc3da960dcd01e4db6caf8492d342",
+  "durationMs": 17208,
+  "coverage": {
+    "materialCount": 6,
+    "skippedCount": 0,
+    "characterCount": 569
+  }
+}

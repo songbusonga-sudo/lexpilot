@@ -4,13 +4,18 @@ import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { makeDemo } from './demo.js';
 import { reportHtml } from './report.js';
+import { consultationBrief, serviceResources } from './legal-service.js';
 import { validateEvent, validateWork, links, checklistItems, validDate } from './progress.js';
 import { validateDispute, factStatuses, moneyToCents } from './workflow.js';
 
 const text=(v,n=2000)=>String(v||'').slice(0,n);
 const cents=v=>v==null?null:(Number.isSafeInteger(v)&&v>=0&&v<=99999999999?v:(()=>{throw Error('备份金额无效')})());
 const hash=buf=>createHash('sha256').update(buf).digest('hex');
-export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase,saveMaterial,detail}) {
+export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase,saveMaterial,detail,assignOwner}) {
+  app.get('/api/legal-services', (req,res)=>res.json(serviceResources));
+  app.get('/api/cases/:id/consultation', (req,res)=>{
+    res.type('text/plain; charset=utf-8').send(consultationBrief(req.case,getMaterials(req.case.id)));
+  });
   function persistDemo(c,materials,replace=false) {
     const written=[];
     try{
@@ -25,13 +30,14 @@ export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase
     }catch(e){for(const name of written)fs.rmSync(path.join(dataDir,'uploads',name),{force:true});throw e;}
   }
   app.post('/api/demos/:scene',(req,res)=>{
-    const {c,materials}=makeDemo(req.params.scene);
+    const {c,materials}=makeDemo(req.params.scene, req.body?.audience);
     persistDemo(c,materials);
+    assignOwner(c.id,req.visitorId);
     res.status(201).json(detail(c));
   });
   app.post('/api/cases/:id/reset-demo',(req,res)=>{
     if(!req.case.demo) return res.status(400).json({error:'仅模拟案例可以重置'});
-    const {c,materials}=makeDemo(req.case.scene);
+    const {c,materials}=makeDemo(req.case.scene, req.case.audience);
     const old=getMaterials(req.case.id);
     c.id=req.case.id;
     for(const m of materials)m.caseId=c.id;
@@ -76,6 +82,7 @@ export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase
   app.get('/api/cases/:id/report',(req,res)=>res.type('html').send(reportHtml(req.case,getMaterials(req.case.id))));
   app.get('/api/cases/:id/backup',(req,res)=>{
     const c=req.case;const ms=getMaterials(c.id);let size=0;
+    if(ms.length>100)throw Error('完整备份最多支持100份材料，请先按事项分组整理；现有材料不会被修改。');
     const materials=ms.map(m=>{
       const copy={...m};delete copy.file;
       if(m.file){const buf=fs.readFileSync(path.join(dataDir,'uploads',m.file));size+=buf.length;
@@ -83,7 +90,9 @@ export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase
         copy.original={base64:buf.toString('base64'),sha256:hash(buf)};}
       return copy;
     });
-    res.json({format:'qingdun-case',version:1,createdAt:new Date().toISOString(),case:c,materials});
+    const payload=JSON.stringify({format:'qingdun-case',version:1,createdAt:new Date().toISOString(),case:c,materials});
+    if(Buffer.byteLength(payload)>120*1024*1024)throw Error('备份总大小超过120MB，请先按事项分组整理；现有材料不会被修改。');
+    res.type('json').send(payload);
   });
   app.post('/api/restore',(req,res)=>{
     const b=req.body;
@@ -117,8 +126,9 @@ export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase
       return n;
     });
     const list=(v)=>{if(!Array.isArray(v)||v.length>200)throw Error('备份记录格式或数量无效');return v;};
-    const c={id,title:text(raw.title,100)+'（恢复副本）',scene:raw.scene,stage:raw.stage,date:raw.date,location:text(raw.location,100),demo:raw.demo===true,archived:false,workflowVersion:2,
-      context:Object.fromEntries(['studentStatus','schoolArrangement','management','payAgreement','insurance','goal'].map(k=>[k,text(raw.context?.[k],1500)])),
+    const c={id,title:text(raw.title,94)+'（恢复副本）',scene:raw.scene,stage:raw.stage,date:raw.date,location:text(raw.location,100),demo:raw.demo===true,archived:false,workflowVersion:2,
+      ...(raw.audience==='asean'?{audience:'asean'}:{}),
+      context:Object.fromEntries(['studentStatus','schoolArrangement','management','payAgreement','insurance','goal','nationality','jurisdiction','serviceLanguage'].map(k=>[k,text(raw.context?.[k],1500)])),
       tasks:list(raw.tasks||[]).map(t=>({text:text(t.text,300),done:t.done===true})),
       settlement:{depositCents:cents(raw.settlement?.depositCents),refundedCents:cents(raw.settlement?.refundedCents)??0,depositMaterialIds:rel(raw.settlement?.depositMaterialIds||[]),refundMaterialIds:rel(raw.settlement?.refundMaterialIds||[])},
       disputes:list(raw.disputes||[]).map(d=>validateDispute({...d,id:undefined,amount:d.amountCents==null?'':(cents(d.amountCents)/100).toFixed(2),materialIds:rel(d.materialIds||[])},materials)),
@@ -132,7 +142,7 @@ export function registerExtensions(app,{db,dataDir,getCase,getMaterials,saveCase
     try{
       for(const f of files){fs.writeFileSync(path.join(dataDir,'uploads',f.name),f.buf,{flag:'wx'});written.push(f.name);}
       db.exec('BEGIN');
-      try{saveCase(c);materials.forEach(saveMaterial);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+      try{saveCase(c);assignOwner(c.id,req.visitorId);materials.forEach(saveMaterial);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
     }catch(e){for(const f of written)fs.rmSync(path.join(dataDir,'uploads',f),{force:true});throw e;}
     res.status(201).json(detail(c));
   });

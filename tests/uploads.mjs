@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { createSessionFetch } from './session-fetch.mjs';
+const fetch = createSessionFetch();
 const base = "http://127.0.0.1:8266/api";
 async function api(route, options) {
   const r = await fetch(base + route, options);
@@ -106,5 +108,6 @@ try {
   }
   db.prepare("DELETE FROM materials WHERE case_id=?").run(c.id);
   db.prepare("DELETE FROM cases WHERE id=?").run(c.id);
+  db.prepare('DELETE FROM case_owners WHERE case_id=?').run(c.id);
   db.close();
 }

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createSessionFetch } from './session-fetch.mjs';
+const fetch = createSessionFetch();
 const base='http://127.0.0.1:8266/api';
 const json=(method,body)=>({method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 async function api(p,o){const r=await fetch(base+p,o),d=await r.json();assert.ok(r.ok,JSON.stringify(d));return d;}

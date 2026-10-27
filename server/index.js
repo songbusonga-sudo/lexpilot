@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { visitorSession } from './visitor.js';
 import { fileURLToPath } from "node:url";
 import { analyze, makeAction, scenarios } from "./domain.js";
 import {
@@ -13,17 +14,21 @@ import {
   extractCandidates,
   factStatuses,
   sourceFingerprint,
+  analysisFingerprint,
+  currentModelFindings,
 } from "./workflow.js";
 import { aiStatus, analyzeWithModel, recognizeImage } from "./ai.js";
 import { registerExtensions } from './extensions.js';
 import { nextActions, workSummary } from './progress.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = path.join(root, "data");
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(root, "data");
 fs.mkdirSync(path.join(dataDir, "uploads"), { recursive: true });
 const db = new DatabaseSync(path.join(dataDir, "qingdun.sqlite"));
 db.exec(
   `CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS materials (id TEXT PRIMARY KEY, case_id TEXT NOT NULL, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);`,
 );
+db.exec('CREATE TABLE IF NOT EXISTS case_owners (case_id TEXT PRIMARY KEY, visitor_id TEXT NOT NULL); CREATE INDEX IF NOT EXISTS case_owners_visitor ON case_owners(visitor_id)');
+const assignOwner = (id, visitorId) => db.prepare('INSERT INTO case_owners (case_id, visitor_id) VALUES (?, ?)').run(id, visitorId);
 const saveCase = (c) => {
   c.updatedAt = new Date().toISOString();
   db.prepare(
@@ -214,13 +219,12 @@ for (const row of db.prepare("SELECT body FROM cases").all()) {
 }
 function detail(c) {
   const materials = getMaterials(c.id);
-  const validAi = (c.aiAnalysis?.findings || []).filter((f) =>
-    materials.some((m) => m.id === f.materialId && m.text?.includes(f.quote)),
-  );
+  const validAi = currentModelFindings(c, materials);
   return {
     ...c,
     materials,
-    findings: [...analyze(materials, c.scene), ...validAi],
+    findings: [...validAi.sort((a,b)=>Number(b.priority==='优先核对')-Number(a.priority==='优先核对')), ...analyze(materials, c.scene)],
+    aiAnalysisStale: !!c.aiAnalysis && c.aiAnalysis.sourceFingerprint !== analysisFingerprint(c, materials),
     settlementSummary: settlementFor(c),
     sourceFingerprint: sourceFingerprint(c, materials),
     nextActions: nextActions(c, materials),
@@ -242,37 +246,54 @@ for (const row of db.prepare("SELECT body FROM cases").all()) {
   }
 }
 const app = express();
+const port = Number(process.env.PORT || 8266);
+const host = process.env.HOST || "127.0.0.1";
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw Error("PORT 必须为 1 到 65535 的整数");
+const publicUrl = process.env.PUBLIC_ORIGIN
+  ? new URL(process.env.PUBLIC_ORIGIN)
+  : null;
+if (publicUrl && !["http:", "https:"].includes(publicUrl.protocol))
+  throw Error("PUBLIC_ORIGIN 必须是 http 或 https 网站地址");
+const allowedHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
+if (publicUrl) allowedHosts.add(publicUrl.hostname);
+const allowedOrigins = new Set([
+  "http://127.0.0.1:5267",
+  "http://localhost:5267",
+  "http://127.0.0.1:8266",
+  "http://localhost:8266",
+  `http://127.0.0.1:${port}`,
+  `http://localhost:${port}`,
+]);
+if (publicUrl) allowedOrigins.add(publicUrl.origin);
 app.use("/api", (req, res, next) => {
   const h = req.hostname;
-  if (!["127.0.0.1", "localhost", "[::1]"].includes(h))
-    return res.status(403).json({ error: "本地版本仅供本机访问" });
+  if (!allowedHosts.has(h))
+    return res.status(403).json({ error: "不允许访问此主机" });
   next();
 });
 app.use("/api", (req, res, next) => {
   const origin = req.get("origin");
   if (
     origin &&
-    ![
-      "http://127.0.0.1:5267",
-      "http://localhost:5267",
-      "http://127.0.0.1:8266",
-      "http://localhost:8266",
-    ].includes(origin)
+    !allowedOrigins.has(origin)
   )
     return res.status(403).json({ error: "不允许来自其他站点的请求" });
   next();
 });
 app.get("/api/health", (req, res) =>
-  res.json({ ok: true, mode: "local", analysis: "rules" }),
+  res.json({ ok: true, mode: publicUrl ? "server" : "local", analysis: aiStatus().textReady ? "rules+model" : "rules" }),
 );
+app.use('/api', visitorSession(!!publicUrl && publicUrl.protocol === 'https:'));
+app.get('/api/session', (req, res) => res.json({ mode: 'visitor', storage: 'server' }));
 app.use('/api/restore', express.json({limit:'120mb'}));
 app.use(express.json({limit:'2mb'}));
 app.get("/api/settings", (req, res) => res.json(aiStatus()));
 app.get("/api/cases", (req, res) =>
   res.json(
     db
-      .prepare("SELECT body FROM cases ORDER BY rowid")
-      .all()
+      .prepare("SELECT cases.body FROM cases JOIN case_owners ON cases.id=case_owners.case_id WHERE case_owners.visitor_id=? ORDER BY cases.rowid")
+      .all(req.visitorId)
       .map((r) => {
         const c = JSON.parse(r.body);
         const materials = getMaterials(c.id);
@@ -320,9 +341,12 @@ app.post("/api/cases", (req, res) => {
     ],
   };
   saveCase(c);
+  assignOwner(c.id, req.visitorId);
   res.status(201).json(c);
 });
 app.use("/api/cases/:id", (req, res, next) => {
+  if (!db.prepare('SELECT case_id FROM case_owners WHERE case_id=? AND visitor_id=?').get(req.params.id, req.visitorId))
+    return res.status(404).json({ error: "事项不存在或不属于当前访客" });
   req.case = getCase(req.params.id);
   if (!req.case) return res.status(404).json({ error: "事项不存在" });
   next();
@@ -370,6 +394,9 @@ app.patch("/api/cases/:id", (req, res) => {
         "payAgreement",
         "insurance",
         "goal",
+        "nationality",
+        "jurisdiction",
+        "serviceLanguage",
       ].map((key) => [key, String(req.body.context[key] || "").slice(0, 1500)]),
     );
   }
@@ -382,6 +409,7 @@ app.delete("/api/cases/:id", (req, res) => {
       fs.rmSync(path.join(dataDir, "uploads", m.file), { force: true });
   db.prepare("DELETE FROM materials WHERE case_id=?").run(req.case.id);
   db.prepare("DELETE FROM cases WHERE id=?").run(req.case.id);
+  db.prepare('DELETE FROM case_owners WHERE case_id=?').run(req.case.id);
   res.json({ ok: true });
 });
 app.post("/api/cases/:id/disputes", (req, res) => {
@@ -455,21 +483,29 @@ app.delete("/api/cases/:id/facts/:fid", (req, res) => {
   saveCase(c);
   res.json(detail(c));
 });
+const analyzing = new Set();
 app.post("/api/cases/:id/analysis", async (req, res, next) => {
+  const id = req.params.id;
+  if (analyzing.has(id)) return res.status(409).json({ error: "此事项正在分析，请等待本次结果" });
   try {
     if (req.body.consent !== true)
       return res
         .status(400)
         .json({ error: "请先确认将材料文字发送至硅基流动进行分析" });
     const snapshot = req.case;
+    analyzing.add(id);
     const result = await analyzeWithModel(snapshot, getMaterials(snapshot.id));
     const current = getCase(snapshot.id);
     if (!current) return res.status(404).json({ error: "事项已被删除" });
+    if (result.sourceFingerprint !== analysisFingerprint(current, getMaterials(id)))
+      return res.status(409).json({ error: "分析期间材料或背景已变化，请按最新内容重新分析" });
     current.aiAnalysis = result;
     saveCase(current);
     res.json(detail(current));
   } catch (e) {
     next(e);
+  } finally {
+    analyzing.delete(id);
   }
 });
 const upload = multer({
@@ -630,7 +666,7 @@ app.delete("/api/cases/:id/materials/:mid", (req, res) => {
   );
   if (c.aiAnalysis)
     c.aiAnalysis.findings = c.aiAnalysis.findings.filter(
-      (f) => f.materialId !== m.id,
+      (f) => f.materialId !== m.id && f.relatedMaterialId !== m.id,
     );
   saveCase(c);
   res.json({ ok: true });
@@ -638,7 +674,7 @@ app.delete("/api/cases/:id/materials/:mid", (req, res) => {
 app.get("/api/cases/:id/materials/:mid/file", (req, res) => {
   const m = getMaterials(req.case.id).find((m) => m.id === req.params.mid);
   if (!m?.file) return res.status(404).json({ error: "无原始文件" });
-  res.type(m.mime).sendFile(path.join(dataDir, "uploads", m.file));
+  res.type(m.mime).sendFile(m.file, { root: path.join(dataDir, "uploads"), dotfiles: "allow" });
 });
 app.post("/api/cases/:id/materials/:mid/ocr", async (req, res, next) => {
   try {
@@ -679,7 +715,7 @@ app.post("/api/cases/:id/draft", (req, res) => {
   saveCase(c);
   res.json({ draft: c.draft });
 });
-registerExtensions(app, { db, dataDir, getCase, getMaterials, saveCase, saveMaterial, detail });
+registerExtensions(app, { db, dataDir, getCase, getMaterials, saveCase, saveMaterial, detail, assignOwner });
 app.use(express.static(path.join(root, "dist")));
 app.get("/{*path}", (req, res) => {
   if (req.path.startsWith("/api"))
@@ -701,6 +737,6 @@ app.use((err, req, res, next) => {
             : err.message || "处理失败，请检查后重试",
     });
 });
-app.listen(8266, "127.0.0.1", () =>
-  console.log("青盾 API：http://127.0.0.1:8266"),
+app.listen(port, host, () =>
+  console.log(`青盾 API：http://${host}:${port}`),
 );

@@ -8,6 +8,22 @@ export const factStatuses = [
   "双方确认",
   "待核实",
 ];
+// Only fields actually sent to the model affect analysis freshness.
+export function analysisFingerprint(c, materials) {
+  return createHash("sha256").update(JSON.stringify({
+    scene: c.scene, stage: c.stage, context: c.context || {},
+    materials: materials.filter(m => m.text?.trim()).map(m => ({
+      id: m.id, name: m.name, text: m.text,
+    })),
+  })).digest("hex");
+}
+export function currentModelFindings(c, materials) {
+  if (!c.aiAnalysis?.sourceFingerprint ||
+      c.aiAnalysis.sourceFingerprint !== analysisFingerprint(c, materials)) return [];
+  return (c.aiAnalysis.findings || []).filter(f =>
+    materials.some(m => m.id === f.materialId && m.text?.includes(f.quote)) &&
+    (!f.relatedMaterialId || materials.some(m => m.id === f.relatedMaterialId && m.text?.includes(f.relatedQuote))));
+}
 export function sourceFingerprint(c, materials) {
   return createHash("sha256")
     .update(
@@ -145,18 +161,27 @@ export function validateModelFindings(data, materials) {
   const findings = [],
     rejected = [];
   for (const raw of data.findings.slice(0, 30)) {
+    if (!raw || typeof raw !== "object") { rejected.push(raw); continue; }
     const m = materials.find((m) => m.id === raw.materialId);
+    const unsupportedConclusion = /不具有法律效力|不具备法律效力|没有法律效力|不具法律效力|效力存疑|does not have legal (?:effect|validity)|has no legal (?:effect|validity)|not legally valid/i.test([raw.title,raw.description,raw.titleEn,raw.descriptionEn].join(' '));
     if (
-      !m ||
+      !m || unsupportedConclusion ||
       typeof raw.quote !== "string" ||
       raw.quote.trim().length < 2 ||
       !m.text?.includes(raw.quote) ||
       typeof raw.title !== "string" ||
       typeof raw.description !== "string"
+      || !raw.title.trim() || !raw.description.trim()
     ) {
       rejected.push(raw);
       continue;
     }
+    const related = raw.relatedMaterialId ? materials.find(m => m.id === raw.relatedMaterialId) : null;
+    if ((raw.relatedMaterialId || raw.relatedQuote) && (!related || related.id === m.id ||
+        typeof raw.relatedQuote !== "string" || raw.relatedQuote.trim().length < 2 || !related.text?.includes(raw.relatedQuote))) {
+      rejected.push(raw); continue;
+    }
+    if (findings.some(f => f.materialId === m.id && f.quote === raw.quote && f.title === raw.title.slice(0, 150))) continue;
     findings.push({
       id: randomUUID(),
       title: raw.title.slice(0, 150),
@@ -165,6 +190,10 @@ export function validateModelFindings(data, materials) {
       materialId: m.id,
       level: "需核实",
       origin: "模型辅助",
+      priority: ["优先核对", "建议核对"].includes(raw.priority) ? raw.priority : "建议核对",
+      ...(typeof raw.titleEn === 'string' && typeof raw.descriptionEn === 'string' && raw.titleEn.trim() && raw.descriptionEn.trim()
+        ? { titleEn: raw.titleEn.slice(0, 300), descriptionEn: raw.descriptionEn.slice(0, 2500) } : {}),
+      ...(related ? { relatedMaterialId: related.id, relatedQuote: raw.relatedQuote.slice(0, 1500) } : {}),
     });
   }
   return { findings, rejectedCount: rejected.length };

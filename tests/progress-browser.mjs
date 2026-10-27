@@ -1,8 +1,10 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createSessionFetch } from './session-fetch.mjs';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],ids=[];
+const fetch = createSessionFetch(page.context());
 page.on('pageerror',e=>errors.push(e.message));
 page.on('response',async r=>{if(r.status()>=400)console.log('HTTP',r.status(),r.url(),(await r.text()).slice(0,300));});
 const json=(method,body)=>({method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -34,7 +36,7 @@ try{
  assert.ok(dl.suggestedFilename().endsWith('.html'));
  const [backup]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'完整备份',exact:true}).click()]);
  await backup.saveAs('artifacts/v3-roundtrip.qingdun.json');
- await page.getByRole('button',{name:'返回我的事项',exact:true}).click();
+ await page.getByRole('button',{name:'返回我的记录',exact:true}).click();
  await page.locator('input[type=file]').setInputFiles('artifacts/v3-roundtrip.qingdun.json');
  await page.getByRole('button',{name:'确认恢复副本',exact:true}).click();
  await page.getByRole('heading',{name:/恢复副本/}).waitFor();ids.push(page.url().split('case/')[1]);
@@ -52,12 +54,16 @@ try{
  await page.goto('http://127.0.0.1:5267/#case/'+intern.id);await tab('实习保障');
  await page.getByLabel('保险保障状态').selectOption('已询问');
  await page.getByPlaceholder('填写保险保障的确认结果或待问问题').fill('已询问企业，等待保单。');
+ page.once('dialog',d=>d.dismiss());await tab('时间线');
+ assert.equal(await page.getByLabel('保险保障状态').inputValue(),'已询问');
+ page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'返回我的记录',exact:true}).click();
+ assert.ok(page.url().includes(intern.id));
  await page.getByRole('button',{name:'保存保障清单',exact:true}).click();
  await page.reload();await tab('实习保障');
  assert.equal(await page.getByLabel('保险保障状态').inputValue(),'已询问');await shot('internship-desktop');
  await page.setViewportSize({width:390,height:844});await shot('internship-mobile');
  for(const name of ['事项概览','时间线','事项报告','实际情况']){await tab(name);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),name+' overflows mobile');await shot(name==='事项报告'?'report-mobile':name==='时间线'?'timeline-mobile':name==='实际情况'?'context-mobile':'overview-mobile');}
  assert.deepEqual(errors,[]);console.log('PASS: actionable guidance, evidence expansion, manual event, report and original-file backup downloads, restore UI, pay ledger, checklist persistence and mobile overflow.');
-}catch(e){console.log('URL',page.url(),'ERRORS',errors);console.log((await page.locator('body').innerText()).slice(-3000));await shot('failure');throw e;}finally{await browser.close();for(const id of ids)await fetch('http://127.0.0.1:8266/api/cases/'+id,{method:'DELETE'});}
+}catch(e){console.log('URL',page.url(),'ERRORS',errors);console.log((await page.locator('body').innerText()).slice(-3000));await shot('failure');throw e;}finally{for(const id of ids)await fetch('http://127.0.0.1:8266/api/cases/'+id,{method:'DELETE'});await browser.close();}
 
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onUnmounted } from "vue";
 import {
   Plus,
   Upload,
@@ -22,16 +22,19 @@ import {
   ChevronRight,
   Settings2,
   CheckCheck,
+  Sparkles,
 } from "lucide-vue-next";
 import MaterialDrawer from "./MaterialDrawer.vue";
 import CaseTools from "./CaseTools.vue";
+import LegalService from "./LegalService.vue";
 import { api, json, money, amountInput, download, scenes } from "../api";
 const props = defineProps({ caseData: Object, settings: Object });
 const emit = defineEmits(["update", "notice", "settings", "pending"]);
 const toolsPanel = ref(null);
+const servicePanel = ref(null);
 const c = computed(() => props.caseData),
   base = computed(() => "/cases/" + c.value.id);
-const tab = ref("overview"),
+const tab = ref(c.value.materials.length ? "overview" : "materials"),
   busy = ref(false),
   uploading = ref(false),
   uploadProgress = ref(0),
@@ -42,6 +45,7 @@ let revertingTab = false;
 watch(tab, (next, previous) => {
   if (revertingTab) { revertingTab = false; return; }
   if (toolsPanel.value && !toolsPanel.value.canLeave()) { revertingTab = true; tab.value = previous; }
+  else if (servicePanel.value && !servicePanel.value.canLeave()) { revertingTab = true; tab.value = previous; }
 }, { flush: 'sync' });
 const selected = ref(null),
   selectedQuote = ref(""),
@@ -50,6 +54,23 @@ const selected = ref(null),
   analysisDialog = ref(false),
   consent = ref(false),
   factForm = ref({});
+const analysisBusy = ref(false), analysisError = ref(""), analysisElapsed = ref(0);
+let analysisTimer;
+let disposed = false;
+onUnmounted(() => { disposed = true; clearInterval(analysisTimer); });
+const analysisMaterials = computed(() => c.value.materials.filter(m => m.text?.trim()));
+const analysisCharacters = computed(() => analysisMaterials.value.reduce((n,m) => n + m.text.length, 0));
+const analysisLimit = computed(() => analysisCharacters.value > 80000 || analysisMaterials.value.some(m => m.text.length > 16000));
+const aiFindings = computed(() => c.value.findings.filter(f => f.origin === "模型辅助"));
+const findingFilter = ref('all');
+const displayedFindings = computed(() => c.value.findings.filter(f => findingFilter.value === 'all' || (findingFilter.value === 'model' ? f.origin === '模型辅助' : f.origin !== '模型辅助')));
+watch([()=>c.value.aiAnalysis?.at,()=>c.value.aiAnalysisStale],()=>{findingFilter.value=aiFindings.value.length ? 'model' : 'all';},{immediate:true});
+const analysisDate = computed(() => c.value.aiAnalysis?.at ? new Date(c.value.aiAnalysis.at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false }) : "");
+function openAnalysis() {
+  consent.value = false;
+  analysisError.value = "";
+  analysisDialog.value = true;
+}
 const disputeForm = ref({
   monetary: true,
   title: "",
@@ -76,6 +97,7 @@ const room = ref("全部区域"),
   right = ref("");
 const tabs = computed(() => ({
   overview: "事项概览",
+  service: "公共法律服务",
   materials: "材料档案",
   facts: "事实核对",
   disputes: "争议清单",
@@ -317,20 +339,28 @@ async function saveFact() {
     factDialog.value = false;
 }
 async function analyze() {
-  if (!consent.value) return;
+  if (!consent.value || analysisBusy.value) return;
   busy.value = true;
+  analysisBusy.value = true;
+  analysisError.value = "";
+  analysisElapsed.value = 0;
+  analysisTimer = setInterval(() => analysisElapsed.value++, 1000);
   try {
     const data = await api(
       base.value + "/analysis",
       json("POST", { consent: true }),
     );
+    if (disposed) return;
     emit("update", data);
     analysisDialog.value = false;
+    tab.value = "facts";
     notify("模型辅助核对完成，引用已校验，请人工核实结果");
   } catch (e) {
-    notify(e.message);
+    analysisError.value = e.message;
   } finally {
     busy.value = false;
+    analysisBusy.value = false;
+    clearInterval(analysisTimer);
   }
 }
 async function generate() {
@@ -513,6 +543,15 @@ function dropped(event) {
   </div>
 
   <template v-if="tab === 'overview'">
+    <section class="ai-launch">
+      <div class="ai-launch-icon"><Sparkles :size="23" :stroke-width="1.5" /></div>
+      <div class="ai-launch-copy"><span class="section-index">AI 材料核对 · 原文可追溯</span>
+        <h2>{{ c.aiAnalysisStale ? '材料已更新，再核对一次' : c.aiAnalysis ? '从核对结果，走向下一步行动' : '把零散材料，整理成有依据的问题' }}</h2>
+        <p>结合{{ scenes[c.scene] }}场景检查条款与主张差异，每个问题关联原文，可继续记录为争议并导出报告。</p>
+        <div class="ai-launch-meta"><span>{{ analysisMaterials.length }} 份可分析材料</span><span>{{ analysisCharacters.toLocaleString() }} 字</span><span>{{ settings.textReady ? '文本模型已配置' : '文本模型待配置' }}</span></div>
+      </div>
+      <div class="ai-launch-actions"><button class="button dark" @click="openAnalysis" :disabled="busy"><Sparkles :size="15" />{{ c.aiAnalysis ? '重新 AI 核对' : '开始 AI 核对' }}</button><button v-if="c.aiAnalysis && !c.aiAnalysisStale" class="text-button" @click="tab='facts'">查看 {{ aiFindings.length }} 项结果 <ArrowRight :size="14" /></button></div>
+    </section>
     <section class="action-priority">
       <div class="section-heading"><div><span class="section-index">现在开始</span><h2>先完成这几步</h2></div><span class="muted">根据当前事项更新</span></div>
       <button v-for="(action,i) in c.nextActions?.slice(0,3)" class="priority-row" @click="action.materialId ? cite(action.materialId) : tab=action.tab"><span>{{String(i+1).padStart(2,'0')}}</span><div><strong>{{action.title}}</strong><p>{{action.description}}</p></div><ArrowUpRight :size="16"/></button>
@@ -634,6 +673,11 @@ function dropped(event) {
   </template>
 
   <template v-if="tab === 'materials'">
+    <section v-if="!c.materials.length" class="visitor-start">
+      <h2>先上传一份材料，或说说你的情况</h2>
+      <p>不用一次准备齐全。从合同、聊天或付款记录中任选一份开始；上传后可查看文字与条款提示，再逐步核对事实。上传本身不会发送给外部分析服务。</p>
+      <div class="visitor-start-actions"><button class="button dark" @click="input.click()" :disabled="uploading"><Upload :size="15" />选择材料</button><button class="button" @click="tab = 'context'">先描述我的情况<ArrowRight :size="15" /></button></div>
+    </section>
     <div class="section-heading">
       <div>
         <h2>材料档案</h2>
@@ -736,7 +780,7 @@ function dropped(event) {
       <p>上传合同、聊天记录、照片或付款凭证。</p>
     </div>
     <p class="table-note">
-      文字型PDF可自动提取。图片识别需配置模型服务，也可直接手动补充文字。
+      文字型 PDF 可自动提取。图片上传后可识别或手动补充文字，请核对识别结果。
     </p>
   </template>
 
@@ -751,16 +795,19 @@ function dropped(event) {
           <Search :size="14" />提取金额与日期</button
         ><button
           class="button dark"
-          @click="
-            consent = false;
-            analysisDialog = true;
-          "
+          @click="openAnalysis"
           :disabled="busy"
         >
           <ListChecks :size="15" />模型辅助核对
         </button>
       </div>
     </div>
+    <section v-if="c.aiAnalysis" class="ai-result-status" :class="{stale:c.aiAnalysisStale}">
+      <div><Sparkles :size="17" /><strong>{{ c.aiAnalysisStale ? '上次分析已过期，请重新核对' : 'AI 核对已完成 · 原文引用已校验' }}</strong></div>
+      <p>{{ c.aiAnalysis.model }} · {{ analysisDate }}（北京时间）<template v-if="c.aiAnalysis.durationMs"> · 耗时 {{ (c.aiAnalysis.durationMs/1000).toFixed(1) }} 秒</template></p>
+      <p v-if="c.aiAnalysisStale">材料或实际背景已改变，上次模型结果已从当前核对清单中移除。</p>
+      <p v-else>{{ aiFindings.length }} 项有效问题<template v-if="c.aiAnalysis.coverage"> · 已分析 {{ c.aiAnalysis.coverage.materialCount }} 份文字材料<template v-if="c.aiAnalysis.coverage.skippedCount"> · {{ c.aiAnalysis.coverage.skippedCount }} 份无文字材料未参与分析</template></template><template v-if="c.aiAnalysis.rejectedCount"> · {{ c.aiAnalysis.rejectedCount }} 项因引用或格式校验未通过而未展示</template>。模型未指出问题，也不代表不存在风险。</p>
+    </section>
     <div class="subsection-title">
       <h3>候选事实</h3>
       <span>材料提取结果默认待核实，支持修改说明和状态。</span>
@@ -801,13 +848,17 @@ function dropped(event) {
       </h3>
       <span>规则检查与模型辅助结果均需人工核实</span>
     </div>
-    <article class="finding-card" v-for="f in c.findings" :key="f.id">
+    <div class="segment finding-filters"><button v-for="(label,key) in {all:'全部问题',model:'AI 辅助 · '+aiFindings.length,rules:'规则检查 · '+(c.findings.length-aiFindings.length)}" :key="key" :class="{active:findingFilter===key}" @click="findingFilter=key">{{label}}</button></div>
+    <article class="finding-card" v-for="f in displayedFindings" :key="f.id">
       <div class="finding-heading">
         <h3>{{ f.title }}</h3>
         <span class="badge">{{ f.origin || "规则检查" }}</span>
+        <span v-if="f.priority" class="badge outline">{{ f.priority }}</span>
       </div>
       <p>{{ f.description }}</p>
+      <div v-if="f.titleEn" class="finding-translation" lang="en"><span>ENGLISH · AI 辅助翻译，请对照原文</span><h4>{{f.titleEn}}</h4><p>{{f.descriptionEn}}</p></div>
       <blockquote>{{ f.quote }}</blockquote>
+      <blockquote v-if="f.relatedQuote" class="related-quote"><span>{{ materialName(f.relatedMaterialId) }}</span>{{ f.relatedQuote }}</blockquote>
       <div class="finding-footer">
         <span>{{ materialName(f.materialId) }}</span
         ><button class="text-button" @click="recordFinding(f)">
@@ -817,7 +868,7 @@ function dropped(event) {
         ><button
           v-if="f.relatedMaterialId"
           class="text-button"
-          @click="cite(f.relatedMaterialId)"
+          @click="cite(f.relatedMaterialId, f.relatedQuote || '')"
         >
           核对另一份材料 <ArrowUpRight :size="14" />
         </button>
@@ -826,6 +877,7 @@ function dropped(event) {
     <div v-if="!c.findings.length" class="notice-bar">
       尚未检出匹配项，不代表没有风险。请先补充并核对材料。
     </div>
+    <p v-else-if="!displayedFindings.length" class="notice-bar">此分类暂无当前有效核对项，请选择其他分类或重新进行 AI 核对。</p>
   </template>
 
   <template v-if="tab === 'disputes'">
@@ -1143,6 +1195,8 @@ function dropped(event) {
 
   <CaseTools ref="toolsPanel" v-if="['timeline','scene','report'].includes(tab)" :case-data="c" :mode="tab" @update="emit('update',$event)" @notice="notify" @view="$event && view($event)" @pending="emit('pending',$event)" />
 
+  <LegalService v-if="tab==='service'" ref="servicePanel" :case-data="c" @update="emit('update',$event)" @notice="notify" @pending="emit('pending',$event)" @analyze="openAnalysis" />
+
   <template v-if="tab === 'actions'">
     <div class="section-heading">
       <div>
@@ -1198,7 +1252,7 @@ function dropped(event) {
               }[docType]
             }}
           </h3>
-          <span>{{ draftDirty ? "有未保存修改" : "保存到本地" }}</span>
+          <span>{{ draftDirty ? "有未保存修改" : "保存到当前记录" }}</span>
         </div>
         <textarea
           v-if="draft"
@@ -1480,10 +1534,19 @@ function dropped(event) {
         ><p class="dialog-description">
           将当前事项的材料文字与已填写背景发送至硅基流动，检查需要核实的问题。原文引用经系统校验后显示，结果仍需人工核对。
         </p>
+        <div class="analysis-manifest"><div><strong>本次发送范围</strong><span>{{ analysisMaterials.length }} 份 · {{ analysisCharacters.toLocaleString() }} 字</span></div>
+          <ul><li v-for="m in analysisMaterials" :key="m.id"><FileText :size="13" /><span>{{ m.name }}</span><small>{{ m.text.length.toLocaleString() }} 字</small></li></ul>
+          <p>同时发送已填写的实际背景、场景与阶段。原始附件与无文字材料不在本次发送范围内。</p>
+        </div>
+        <p v-if="!analysisMaterials.length" class="warning-bar">尚无可分析文字，请先上传文字材料，或识别图片并核对保存。</p>
+        <p v-if="analysisLimit" class="warning-bar">单份材料最多16000字，总计最多80000字。请先拆分或整理超限材料，系统不会静默截断原文。</p>
+        <div v-if="analysisBusy" class="analysis-progress" role="status" aria-live="polite"><LoaderCircle class="spinning" :size="19" /><div><strong>{{ analysisElapsed < 3 ? '正在提交材料' : '模型正在核对材料与原文' }}</strong><p>已等待 {{ analysisElapsed }} 秒 · 通常需要数十秒，返回后自动校验引用。</p></div></div>
+        <p v-if="analysisError" class="warning-bar" role="alert">{{ analysisError }}。已有分析记录会保留，可重试。</p>
         <label class="consent-label"
           ><input
             type="checkbox"
             v-model="consent"
+            :disabled="busy"
           />我已核对材料范围，同意发送文字进行本次分析。</label
         >
         <div class="dialog-footer">
@@ -1496,7 +1559,7 @@ function dropped(event) {
           ><button
             class="button dark"
             @click="analyze"
-            :disabled="!consent || busy"
+            :disabled="!consent || busy || !analysisMaterials.length || analysisLimit"
           >
             <LoaderCircle v-if="busy" class="spinning" :size="15" />{{
               busy ? "分析中…" : "开始核对"
@@ -1505,14 +1568,14 @@ function dropped(event) {
         </div></template
       ><template v-else
         ><p class="dialog-description">
-          尚未配置硅基流动文本模型。规则检查、候选事实提取、争议清单和草稿功能可以继续使用。
+          辅助分析暂不可用。条款提示、事实提取、争议清单和草稿功能可以继续使用。
         </p>
-        <div class="notice-bar">需要在后端配置 API Key 和文本模型名称。</div>
+        <div class="notice-bar">辅助分析暂不可用，你可以继续整理材料和核对金额。</div>
         <div class="dialog-footer">
           <button class="button" @click="analysisDialog = false">
-            继续使用本地功能</button
+            继续整理材料</button
           ><button class="button dark" @click="emit('settings')">
-            查看服务设置
+            查看服务说明
           </button>
         </div></template
       >

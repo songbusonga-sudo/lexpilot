@@ -1,4 +1,4 @@
-import { settlementFor, yuan, sourceFingerprint } from './workflow.js';
+import { settlementFor, yuan, sourceFingerprint, analysisFingerprint, currentModelFindings } from './workflow.js';
 import { nextActions, workSummary, checklistItems } from './progress.js';
 import { scenarios } from './domain.js';
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,6 +11,7 @@ export function reportHtml(c,ms) {
   html+=p('记录中的单方主张、用户确认和待核实信息均按录入状态呈现，不构成事实真实性、证据效力或最终责任的认定。');
   html+='<h2>一 事项背景与事实摘要</h2>'+p(`地点：${c.location||'未填写'}；建档日期：${c.date}`);
   const labels={studentStatus:'在校状态',schoolArrangement:'学校参与',management:'实际管理',payAgreement:'报酬约定',insurance:'保险安排',goal:'处理目标'};
+  Object.assign(labels,{nationality:'国籍或地区（自述）',jurisdiction:'事项发生地',serviceLanguage:'辅助核对语言'});
   for(const [key,label] of Object.entries(labels)) if(c.context?.[key]) html+=p(`${label}：${c.context[key]}`);
   html+=(c.facts||[]).length?table(['录入事实','信息状态','出处'],c.facts.map(f=>[f.text,f.status,names([f.materialId])])):p('尚未整理独立事实条目，请结合下列事件及原材料核对。');
   html+='<h2>二 争议与待确认项目</h2>';
@@ -40,6 +41,15 @@ export function reportHtml(c,ms) {
     for(const [key,label] of Object.entries(labels)) if(c.drafts?.[key]){
       const draft=c.drafts[key];
       html+=`<h3>${e(label)}</h3>`+p(draft.sourceFingerprint!==sourceFingerprint(c,ms)?'来源已变化或由备份恢复，此草稿需要重新核对。':'请核对草稿内容后再使用。')+p(draft.text);
+    }
+  }
+  if(c.aiAnalysis){
+    const a=c.aiAnalysis, stale=a.sourceFingerprint!==analysisFingerprint(c,ms);
+    html+='<h2>附录 AI辅助核对与引用校验</h2>'+p(`模型：${a.model}；分析时间：${a.at}；${stale?'材料或背景已更新，上次分析已过期，未纳入本报告问题清单。':'以下为原文匹配通过的模型辅助问题，仍需人工核实。'}`);
+    if(!stale){
+      if(a.coverage) html+=p(`分析范围：${a.coverage.materialCount}份文字材料，${a.coverage.characterCount}字；未分析无文字材料${a.coverage.skippedCount}份。`);
+      for(const f of currentModelFindings(c,ms)) html+=`<h3>${e(f.title)}</h3>`+p(f.description)+(f.titleEn?p(`[English machine translation] ${f.titleEn}`)+p(f.descriptionEn):'')+p(`${names([f.materialId])}：${f.quote}`)+(f.relatedMaterialId?p(`${names([f.relatedMaterialId])}：${f.relatedQuote}`):'');
+      html+=p(`${a.rejectedCount||0}项因引用或格式校验未通过而未展示。引用匹配不代表结论正确，未指出问题不代表没有风险。`);
     }
   }
   html+=p('本报告为导出时快照，不包含原始图片与文件。提交或转交前请核对报告内容，并按目录提供原始材料。');

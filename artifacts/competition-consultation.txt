@@ -1,0 +1,72 @@
+青盾 · 法律咨询准备材料 / Qingdun · Legal consultation preparation
+模拟案例 / SIMULATED CASE
+事项 / Case: 越南留学生 · 双语租房押金核对
+编号 / ID: 2dbca71c-1f78-4b8c-bba3-12fe49f24021
+导出时间 / Exported at: 2026-10-27T04:17:59.843Z
+
+一、咨询背景 / 1. Intake
+国籍或地区（自述）/ Nationality or region (self-reported): 越南 Vietnam
+事项发生地 / Location of matter: 中国内地 Mainland China
+具体地点 / Specific location: 中国广西南宁（模拟）
+服务语言 / Preferred language: bilingual
+处理目标（原文）/ Goal (original): 核对中文沟通与英文材料，整理可交给法律服务人员的中英双语问题。
+
+二、双方主张与待核实事项 / 2. Claims and open questions
+1. 墙面维修扣款 [录入状态 / Recorded status: 有争议]
+对方主张（原文）/ Other party's claim (original): 房东要求扣800元
+本人说明（原文）/ My statement (original): 入住交接记录有旧痕说明，责任待核对
+待核实（原文）/ To verify (original): 补充维修费用凭证、双方交接确认及真实原始照片。
+涉及金额 / Amount involved: 800.00 CNY（录入值 / Recorded value）
+材料 / Materials: Rental agreement (simulated).txt; Move-in record (simulated).txt; 退租沟通记录.txt; 入住墙面示意图.png; 退租墙面示意图.png
+
+2. 押金退还时间 [录入状态 / Recorded status: 待核实]
+对方主张（原文）/ Other party's claim (original): 尚未明确退款日期
+本人说明（原文）/ My statement (original): 希望确认书面结算与退款日期
+待核实（原文）/ To verify (original): 书面退款安排。
+涉及金额 / Amount involved: 非金额项目 / Non-monetary
+材料 / Materials: Rental agreement (simulated).txt; 押金付款记录.txt; 退租沟通记录.txt
+
+3. 维修扣款明细与凭证缺失 [录入状态 / Recorded status: 待核实]
+对方主张（原文）/ Other party's claim (original): 未填写 / Not provided
+本人说明（原文）/ My statement (original): 未填写 / Not provided
+待核实（原文）/ To verify (original): 房东主张扣款800元，但尚未提供维修明细与凭证，无法核实扣款合理性。请要求房东书面提供维修清单、报价单及支付凭证。
+涉及金额 / Amount involved: 未知 / Unknown
+材料 / Materials: 退租沟通记录.txt; Rental agreement (simulated).txt
+
+三、AI辅助问题 / 3. AI-assisted questions
+1. 维修扣款明细与凭证缺失
+房东主张扣款800元，但尚未提供维修明细与凭证，无法核实扣款合理性。请要求房东书面提供维修清单、报价单及支付凭证。
+[Machine translation] Missing repair itemization and vouchers for deduction
+The landlord claims a deduction of 800 CNY but has not provided itemization or vouchers, making it impossible to verify the reasonableness of the deduction. Please request the landlord to provide a written repair list, quotation, and payment vouchers.
+原文 / Original [退租沟通记录.txt]: 【模拟】房东：墙面需要维修，扣款800元。租客：入住时已有旧痕，请提供维修明细与凭证。房东尚未提供。
+对照原文 / Comparison [Rental agreement (simulated).txt]: [SIMULATED] Security deposit: CNY 2,000. After inspection at the end of the tenancy, relevant charges may be deducted and the remaining deposit returned. Repair responsibility shall be discussed based on the actual circumstances. No refund deadline is specified.
+
+2. 入住痕迹记录未双方签署
+入住记录记载了墙面旧痕，但未由双方签署，且明确说明不确立损坏原因。请确认该记录是否已补签，或要求房东承认入住时墙面状况。
+[Machine translation] Move-in record not signed by both parties
+The move-in record notes existing marks on the wall but is not signed by both parties and explicitly states it does not establish the cause of any damage. Please confirm whether this record has been countersigned, or request the landlord to acknowledge the wall condition at move-in.
+原文 / Original [Move-in record (simulated).txt]: [SIMULATED] Existing marks on the bedroom wall were noted at move-in. This record has not been signed by both parties. It does not establish the cause of any damage.
+
+3. 押金退还日期未约定
+租赁协议未指定退款截止日期，导致退款时间不确定。请要求房东书面确认具体退款日期。
+[Machine translation] Refund deadline not specified
+The rental agreement does not specify a refund deadline, making the refund timing uncertain. Please request the landlord to confirm the specific refund date in writing.
+原文 / Original [Rental agreement (simulated).txt]: [SIMULATED] Security deposit: CNY 2,000. After inspection at the end of the tenancy, relevant charges may be deducted and the remaining deposit returned. Repair responsibility shall be discussed based on the actual circumstances. No refund deadline is specified.
+
+
+四、材料目录 / 4. Material index
+1. Rental agreement (simulated).txt | 合同协议 | 2026-07-01 | 日期已由用户核对 / Date checked by user
+2. Move-in record (simulated).txt | 交接记录 | 2026-07-01 | 日期已由用户核对 / Date checked by user
+3. 押金付款记录.txt | 付款凭证 | 2026-07-01 | 日期已由用户核对 / Date checked by user
+4. 退租沟通记录.txt | 聊天记录 | 2026-10-24 | 日期已由用户核对 / Date checked by user
+5. 入住墙面示意图.png | 照片图片 | 2026-07-01 | 日期待核实 / Date to verify
+6. 退租墙面示意图.png | 照片图片 | 2026-10-24 | 日期待核实 / Date to verify
+
+五、咨询渠道 / 5. Service information
+中国法律服务网 / China Legal Service Network: https://www.12348.gov.cn/
+广西壮族自治区司法厅 / Department of Justice of Guangxi: https://sft.gxzf.gov.cn/
+
+本材料不会自动发送。请自行向服务人员提供原件并核对英文机器翻译。国籍不决定准据法或法律援助资格。
+Nothing is sent automatically. Provide original documents to your adviser and verify any machine translation. Nationality alone does not determine applicable law or legal aid eligibility.
+境外事项应咨询当地合资格服务人员。本材料不提供外国法结论，不代表律师意见或法律援助申请已受理。
+For matters outside mainland China, consult a qualified local provider. This document gives no foreign-law conclusion and does not confirm legal representation or acceptance of a legal aid application.

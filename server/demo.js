@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-export function makeDemo(scene) {
+export function makeDemo(scene, audience) {
   if (!['rental','parttime','internship'].includes(scene)) throw Error('演示场景无效');
   const id=randomUUID();
   const c={id,scene,demo:true,demoRevision:3,archived:false,workflowVersion:2,stage:scene==='rental'?'已经发生问题':'准备签约',
@@ -43,6 +43,20 @@ export function makeDemo(scene) {
     c.checklist={insurance:{status:'待确认',note:'协议写明另行通知，尚未取得保险凭证。',materialIds:[agreement]}};
     event('收到实习协议','2026-10-24','签约前核对保险、报酬和退出条件。',[agreement]);
     c.tasks=[{text:'向企业确认保险购买主体',done:false},{text:'向学校核实实习安排',done:false}];
+  }
+  if(audience==='asean') {
+    c.audience='asean';
+    c.title={rental:'越南留学生 · 双语租房押金核对',parttime:'东盟留学生 · 兼职报酬核对',internship:'东盟留学生 · 实习保障核对'}[scene];
+    c.location='中国广西南宁（模拟）';
+    c.context={...c.context,nationality:'越南 Vietnam',jurisdiction:'中国内地 Mainland China',serviceLanguage:'bilingual',studentStatus:'在校学生',goal:'核对中文沟通与英文材料，整理可交给法律服务人员的中英双语问题。'};
+    if(scene==='rental') {
+      const contract=materials.find(m=>m.type==='合同协议');
+      contract.name='Rental agreement (simulated).txt';
+      contract.text='[SIMULATED] Security deposit: CNY 2,000. After inspection at the end of the tenancy, relevant charges may be deducted and the remaining deposit returned. Repair responsibility shall be discussed based on the actual circumstances. No refund deadline is specified.';
+      const handover=materials.find(m=>m.type==='交接记录');
+      handover.name='Move-in record (simulated).txt';
+      handover.text='[SIMULATED] Existing marks on the bedroom wall were noted at move-in. This record has not been signed by both parties. It does not establish the cause of any damage.';
+    }
   }
   return {c,materials};
 }

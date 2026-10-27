@@ -1,0 +1,25 @@
+[Unit]
+Description=Qingdun student rights workbench
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/qingdun/current
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/qingdun/shared/.env
+ExecStart=/opt/qingdun-runtime/node/bin/node server/index.js
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/qingdun/shared/data
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

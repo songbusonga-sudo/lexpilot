@@ -12,14 +12,21 @@ const workEmpty=()=>({task:'',date:today(),hours:'',agreed:'',received:'0',statu
 const event=ref(eventEmpty()),work=ref(workEmpty()),checklist=ref({}),checkDirty=ref(false);
 const hasPending=computed(()=>checkDirty.value || eventOpen.value || workOpen.value);
 watch(hasPending,value=>emit('pending',value));
-function canLeave(){return !hasPending.value || confirm('此页有尚未保存的内容，确定离开并放弃修改？');}
+function canLeave(){
+  if(!hasPending.value)return true;
+  if(!confirm('此页有尚未保存的内容，确定离开并放弃修改？'))return false;
+  eventOpen.value=false;workOpen.value=false;checkDirty.value=false;
+  event.value=eventEmpty();work.value=workEmpty();resetChecklist(c.value.checklist);
+  return true;
+}
 defineExpose({canLeave});
 function unload(e){if(hasPending.value){e.preventDefault();e.returnValue='';}}
 onMounted(()=>window.addEventListener('beforeunload',unload));
 onUnmounted(()=>{window.removeEventListener('beforeunload',unload);emit('pending',false);});
 const checklistItems=[['school','学校参与方式','学校是否组织或批准实习，校内联系人是谁？'],['insurance','保险保障','由谁购买、保障期间与范围是什么，是否有凭证？'],['safety','工作与安全安排','工作地点、岗位、作息及意外联系渠道是否明确？'],['pay','报酬与结算','标准、支付主体、周期与扣减条件是否明确？'],['exit','退出与交接','提前通知期限、学校沟通和交接程序是否明确？']];
+function resetChecklist(value){checklist.value=Object.fromEntries(checklistItems.map(([id])=>[id,{status:value?.[id]?.status||'待确认',note:value?.[id]?.note||'',materialIds:[...(value?.[id]?.materialIds||[])]}]));}
 watch(()=>c.value.checklist, value=>{
-  if(!checkDirty.value)checklist.value=Object.fromEntries(checklistItems.map(([id])=>[id,{status:'待确认',note:'',materialIds:[],...value?.[id]}]));
+  if(!checkDirty.value)resetChecklist(value);
 },{immediate:true,deep:true});
 const timeline=computed(()=>[
   ...c.value.materials.map(m=>({id:m.id,date:m.date,dateConfirmed:m.dateConfirmed,title:m.name,note:m.text?.slice(0,180)||'尚无文字，请核对原始材料。',status:m.source||'材料记载',materialIds:[m.id],kind:'material'})),
@@ -73,7 +80,7 @@ function exportWork(){const cell=v=>'"'+String((typeof v==='string' && /^[=+@\-\
  <section v-if="mode==='scene' && c.scene==='internship'" class="tools-section">
   <div class="section-heading"><div><h2>实习保障清单</h2><span class="muted">已确认 {{Object.values(checklist).filter(r=>r.status==='已确认').length}} / 5</span></div><button class="button dark" :disabled="busy" @click="saveChecklist"><Check :size="14"/>保存清单</button></div>
   <p class="tools-note">“已确认”由你根据实际沟通标记，建议关联书面材料；协议名称本身不能确定法律关系。</p>
-  <div @input="checkDirty=true" @change="checkDirty=true"><article v-for="([id,title,question],i) in checklistItems" class="tools-record"><div class="section-heading"><h3>0{{i+1}} {{title}}</h3><select v-model="checklist[id].status" :aria-label="title+'状态'"><option v-for="s in ['待确认','已询问','已确认','不适用']">{{s}}</option></select></div><p class="muted">{{question}}</p><label class="field">核对记录<textarea v-model="checklist[id].note" rows="2" maxlength="2000" :placeholder="'填写'+title+'的确认结果或待问问题'"/></label><fieldset class="tools-evidence"><legend>关联材料</legend><label v-for="m in c.materials"><input v-model="checklist[id].materialIds" type="checkbox" :value="m.id">{{m.name}}</label></fieldset></article></div>
+  <div @input="$event.target.tagName !== 'SELECT' && (checkDirty=true)" @change="checkDirty=true"><article v-for="([id,title,question],i) in checklistItems" class="tools-record"><div class="section-heading"><h3>0{{i+1}} {{title}}</h3><select v-model="checklist[id].status" :aria-label="title+'状态'"><option v-for="s in ['待确认','已询问','已确认','不适用']">{{s}}</option></select></div><p class="muted">{{question}}</p><label class="field">核对记录<textarea v-model="checklist[id].note" rows="2" maxlength="2000" :placeholder="'填写'+title+'的确认结果或待问问题'"/></label><fieldset class="tools-evidence"><legend>关联材料</legend><label v-for="m in c.materials"><input v-model="checklist[id].materialIds" type="checkbox" :value="m.id">{{m.name}}</label></fieldset></article></div>
   <div class="tools-actions"><span class="muted">{{checkDirty?'有修改尚未保存':'清单已与事项同步'}}</span><button class="button dark" :disabled="busy" @click="saveChecklist">保存保障清单</button></div>
  </section>
 

@@ -25,11 +25,12 @@ import {
   CircleHelp,
 } from "lucide-vue-next";
 import Workbench from "./components/Workbench.vue";
+import PublicHome from './components/PublicHome.vue';
 import RestoreBackup from "./components/RestoreBackup.vue";
 import { api, json, scenes, stages } from "./api";
 const cases = ref([]),
   active = ref(null),
-  page = ref("dashboard"),
+  page = ref("home"),
   query = ref(""),
   sceneFilter = ref("all"),
   statusFilter = ref("active");
@@ -41,6 +42,8 @@ const modal = ref(false),
   mobileNav = ref(false),
   help = ref(false);
 const settings = ref({ textReady: false, visionReady: false });
+const ready = ref(false);
+function reloadPage() { window.location.reload(); }
 const pendingChanges = ref(false);
 const form = ref({
   title: "",
@@ -63,20 +66,20 @@ const visible = computed(() =>
         ? c.archived
         : statusFilter.value === "demo"
           ? c.demo && !c.archived
-          : !c.archived) &&
+          : !c.archived && !c.demo) &&
       (sceneFilter.value === "all" || c.scene === sceneFilter.value) &&
       c.title.toLowerCase().includes(query.value.toLowerCase()),
   ),
 );
 const recent = computed(() =>
-  [...live.value]
+  [...real.value]
     .sort((a, b) =>
       (b.updatedAt || b.date).localeCompare(a.updatedAt || a.date),
     )
     .slice(0, 5),
 );
 const todos = computed(() =>
-  live.value
+  real.value
     .flatMap((c) =>
       (c.nextActions || []).map(t=>({...t,text:t.title}))
         .map((t) => ({ ...t, caseId: c.id, title: c.title, demo: c.demo })),
@@ -84,13 +87,13 @@ const todos = computed(() =>
     .slice(0, 4),
 );
 const metrics = computed(() => ({
-  materials: live.value.reduce((n, c) => n + c.materialCount, 0),
-  disputes: live.value.reduce(
+  materials: real.value.reduce((n, c) => n + c.materialCount, 0),
+  disputes: real.value.reduce(
     (n, c) =>
       n + (c.disputes?.filter((d) => d.status !== "双方确认").length || 0),
     0,
   ),
-  tasks: live.value.reduce(
+  tasks: real.value.reduce(
     (n, c) => n + c.tasks.filter((t) => !t.done).length,
     0,
   ),
@@ -113,7 +116,13 @@ function receiveCase(data) {
   active.value = data;
   load().catch((e) => notice(e.message));
 }
+function canNavigate() {
+  if (pendingChanges.value && !confirm('有尚未保存的内容，确定离开并放弃修改？')) return false;
+  pendingChanges.value = false;
+  return true;
+}
 async function openCase(id, route = true) {
+  if (active.value?.id !== id && !canNavigate()) return;
   try {
     active.value = await api("/cases/" + id);
     page.value = "detail";
@@ -125,8 +134,7 @@ async function openCase(id, route = true) {
   }
 }
 function go(p) {
-  if (pendingChanges.value && !confirm('有尚未保存的内容，确定离开并放弃修改？')) return;
-  pendingChanges.value = false;
+  if (!canNavigate()) return;
   page.value = p;
   active.value = null;
   mobileNav.value = false;
@@ -134,13 +142,17 @@ function go(p) {
 }
 async function readRoute() {
   const route = location.hash.slice(1);
+  if (active.value && route !== 'case/' + active.value.id && !canNavigate()) {
+    history.replaceState(null, '', '#case/' + active.value.id);
+    return;
+  }
   if (route.startsWith("case/")) {
     const id = decodeURIComponent(route.slice(5));
     if (active.value?.id !== id) await openCase(id, false);
   } else {
-    page.value = ["dashboard", "cases", "guide", "settings"].includes(route)
+    page.value = ["home", "dashboard", "cases", "guide", "settings"].includes(route)
       ? route
-      : "dashboard";
+      : "home";
     active.value = null;
     mobileNav.value = false;
   }
@@ -149,6 +161,12 @@ function start(scene = "rental") {
   editMode.value = false;
   form.value = { title: "", scene, stage: "准备签约", location: "" };
   modal.value = true;
+}
+async function quickStart(problem) {
+  if (busy.value || !ready.value) return;
+  editMode.value = false;
+  form.value = { title: problem.title, scene: problem.scene, stage: problem.stage, location: '' };
+  await submit();
 }
 function edit() {
   editMode.value = true;
@@ -204,12 +222,12 @@ async function remove() {
     notice(e.message);
   }
 }
-async function experience(scene) {
+async function experience(scene, audience = '') {
   if(busy.value)return;
-  const existing=cases.value.find(c=>c.demo && c.demoRevision===3 && c.scene===scene && !c.archived);
+  const existing=cases.value.find(c=>c.demo && c.demoRevision===3 && c.scene===scene && (c.audience||'')===audience && !c.archived);
   if(existing)return openCase(existing.id);
   busy.value=true;
-  try{const c=await api('/demos/'+scene,json('POST',{}));await load();await openCase(c.id);}catch(e){notice(e.message);}finally{busy.value=false;}
+  try{const c=await api('/demos/'+scene,json('POST',{audience}));await load();await openCase(c.id);}catch(e){notice(e.message);}finally{busy.value=false;}
 }
 async function resetDemo(){
   if(!confirm('恢复此模拟案例的初始材料与记录？对此案例的编辑和上传将被清除。个人事项不受影响。'))return;
@@ -219,13 +237,15 @@ async function resetDemo(){
 async function restored(c){receiveCase(c);await openCase(c.id);}
 onMounted(async () => {
   try {
+    await api('/session');
     await Promise.all([
       load(),
       api("/settings").then((s) => (settings.value = s)),
     ]);
     await readRoute();
+    ready.value = true;
   } catch (e) {
-    error.value = "无法连接本地服务，请确认后端8266端口已启动。";
+    error.value = "暂时无法连接服务，请刷新页面重试。";
   }
   window.addEventListener("hashchange", readRoute);
 });
@@ -236,108 +256,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-layout">
-    <div v-if="mobileNav" class="nav-scrim" @click="mobileNav = false"></div>
-    <aside class="sidebar" :class="{ open: mobileNav }">
-      <a href="#dashboard" class="brand" @click.prevent="go('dashboard')"
-        ><span class="brand-mark"
-          ><Shield :size="24" :stroke-width="1.6" /></span
-        ><span>青盾<span class="brand-sub">大学生权益工作台</span></span></a
-      >
-      <div class="workspace-switch">
-        <span class="workspace-letter">Q</span>
-        <div>个人工作空间<small>本地版本 · v0.3</small></div>
-        <ChevronRight :size="13" />
-      </div>
-      <div class="nav-label">工作空间</div>
-      <nav aria-label="主要导航">
-        <button
-          :class="{ selected: page === 'dashboard' }"
-          @click="go('dashboard')"
-        >
-          <LayoutDashboard :size="17" />工作台
-        </button>
-        <button
-          :class="{ selected: page === 'cases' || page === 'detail' }"
-          @click="
-            statusFilter = 'active';
-            sceneFilter = 'all';
-            go('cases');
-          "
-        >
-          <FolderOpen :size="17" />我的事项<span class="nav-count">{{
-            live.length
-          }}</span>
-        </button>
-        <button :class="{ selected: page === 'guide' }" @click="go('guide')">
-          <BookOpen :size="17" />权益指南
-        </button>
-      </nav>
-      <div class="nav-label secondary-label">按场景查看</div>
-      <nav class="scene-nav">
-        <button
-          v-for="(name, key) in scenes"
-          :key="key"
-          @click="
-            sceneFilter = key;
-            statusFilter = 'active';
-            go('cases');
-          "
-        >
-          <component :is="icons[key]" :size="16" />{{ name }}事项
-        </button>
-      </nav>
-      <div class="sidebar-bottom">
-        <nav>
-          <button
-            :class="{ selected: page === 'settings' }"
-            @click="go('settings')"
-          >
-            <Settings2 :size="17" />服务设置</button
-          ><button @click="help = true">
-            <CircleHelp :size="17" />使用说明
-          </button>
+  <div class="app-layout" :class="{ 'public-layout': page === 'home' }">
+    <PublicHome v-if="page === 'home'" :busy="busy" :ready="ready" :count="real.length" :resume-case="recent[0]" @resume="openCase" @start="quickStart" @demo="experience" @records="go('cases')" @guide="go('guide')" />
+    <div v-if="page === 'home' && error" class="public-error" role="alert">{{ error }}<button class="button" @click="reloadPage">重新加载</button></div>
+    <div v-if="page !== 'home'" class="main-shell consumer-shell">
+      <header class="public-header consumer-header">
+        <a href="#home" class="public-brand brand" @click.prevent="go('home')"><Shield :size="27" /><strong>青盾</strong><span>大学生权益助手</span></a>
+        <nav aria-label="网站导航">
+          <button :class="{ 'current-page': page === 'cases' || page === 'detail' }" @click="statusFilter = 'active'; sceneFilter = 'all'; go('cases')">我的记录</button>
+          <button :class="{ 'current-page': page === 'guide' }" @click="go('guide')">权益指南</button>
+          <button :class="{ 'current-page': page === 'settings' }" @click="go('settings')">隐私说明</button>
+          <button class="button" @click="go('home')">开始新问题<ArrowRight :size="14" /></button>
         </nav>
-        <div class="local-account">
-          <span class="account-avatar">我</span>
-          <div>本机用户<small>材料保存在当前设备</small></div>
-          <span class="connection-dot"></span>
-        </div>
-      </div>
-    </aside>
-    <div class="main-shell">
-      <header class="topbar">
-        <div class="breadcrumbs">
-          <button
-            class="mobile-toggle icon-button"
-            @click="mobileNav = !mobileNav"
-            aria-label="展开导航"
-          >
-            <Menu :size="20" /></button
-          ><span>个人工作空间</span><ChevronRight :size="12" /><strong>{{
-            page === "dashboard"
-              ? "工作台"
-              : page === "guide"
-                ? "权益指南"
-                : page === "settings"
-                  ? "服务设置"
-                  : page === "detail"
-                    ? "事项档案"
-                    : "我的事项"
-          }}</strong>
-        </div>
-        <div class="header-status">
-          <span class="status-dot"></span> 本地服务<span
-            class="header-divider"
-          ></span
-          ><button
-            class="icon-button"
-            @click="help = true"
-            aria-label="使用说明"
-          >
-            <CircleHelp :size="17" />
-          </button>
-        </div>
       </header>
       <main>
         <div v-if="error" class="error-box">
@@ -355,18 +285,19 @@ onUnmounted(() => {
         <template v-if="page === 'dashboard'">
           <div class="page-heading">
             <div>
-              <div class="overline">工作空间 / OVERVIEW</div>
-              <h1>工作台</h1>
+              <div class="overline">我的记录 / OVERVIEW</div>
+              <h1>记录概览</h1>
               <p>集中整理材料、核对事实，跟进每一项权益事项。</p>
             </div>
             <button class="button dark" @click="start()">
               <Plus :size="16" />新建事项
             </button>
           </div>
+          <section class="asean-entry"><div><span class="section-index">CHINA–ASEAN · PUBLIC LEGAL SERVICE</span><h2>在陌生的语言里，也能说清自己的权益</h2><p>面向中国与东盟学生，整理租房、兼职和实习材料，准备有原文依据的中英双语咨询问题。</p><p lang="en">Turn scattered documents into clear questions for legal consultation.</p></div><button class="button dark" :disabled="busy" @click="experience('rental','asean')">体验东盟双语案例 / Try demo <ArrowRight :size="15"/></button></section>
           <div class="metrics">
             <div>
               <span>进行中事项</span
-              ><strong>{{ live.length.toString().padStart(2, "0") }}</strong
+              ><strong>{{ real.length.toString().padStart(2, "0") }}</strong
               ><small>个人 {{ real.length }} · 演示 {{ demos.length }}</small>
             </div>
             <div>
@@ -386,7 +317,7 @@ onUnmounted(() => {
             <div>
               <span>待完成行动</span
               ><strong>{{ metrics.tasks.toString().padStart(2, "0") }}</strong
-              ><small>包括演示事项中的待办</small>
+              ><small>你的记录中尚未完成的待办</small>
             </div>
           </div>
           <div class="dashboard-columns">
@@ -523,8 +454,8 @@ onUnmounted(() => {
         <template v-else-if="page === 'cases'">
           <div class="page-heading">
             <div>
-              <div class="overline">工作空间 / CASES</div>
-              <h1>我的事项</h1>
+              <div class="overline">我的记录 / RECORDS</div>
+              <h1>我的记录</h1>
               <p>让问题、材料与每一次进展，保存在同一份档案里。</p>
             </div>
             <RestoreBackup @restored="restored" @notice="notice" />
@@ -606,7 +537,7 @@ onUnmounted(() => {
         </template>
         <template v-else-if="page === 'detail' && active">
           <button class="back-button" @click="go('cases')">
-            <ArrowLeft :size="14" />返回我的事项
+            <ArrowLeft :size="14" />返回我的记录
           </button>
           <div class="page-heading case-heading">
             <div>
@@ -747,29 +678,28 @@ onUnmounted(() => {
         <template v-else-if="page === 'settings'">
           <div class="page-heading">
             <div>
-              <div class="overline">工作空间 / SETTINGS</div>
-              <h1>服务设置</h1>
-              <p>查看本地功能与外部模型服务的连接状态。</p>
+              <div class="overline">隐私说明 / PRIVACY</div>
+              <h1>数据与隐私</h1>
+              <p>了解记录如何保存，以及如何保管自己的材料。</p>
             </div>
           </div>
           <div class="settings-list">
             <section>
               <div class="settings-icon"><FolderOpen :size="21" /></div>
               <div>
-                <h2>本地档案服务 <span class="badge">已连接</span></h2>
+                <h2>独立访客记录 <span class="badge">无需注册</span></h2>
                 <p>
-                  事项、材料与编辑记录保存在当前设备。删除材料会同时删除原始上传文件。
+                  事项、材料与编辑记录保存在服务器，通过当前浏览器的 Cookie 识别归属。其他访客无法通过事项链接访问你的记录。删除材料会同时删除原始上传文件。
                 </p>
                 <div class="settings-detail">
-                  前端 5267 <span>/</span> 后端 8266 <span>/</span> SQLite
-                  本地存储
+                  清除 Cookie、使用无痕模式或更换设备后，可能无法找回原有记录。访客身份有效期为一年。
                 </div>
               </div>
             </section>
             <section>
               <div class="settings-icon"><FileText :size="21" /></div>
               <div>
-                <h2>材料文字核对 <span class="badge">本地可用</span></h2>
+                <h2>材料文字核对 <span class="badge">可直接使用</span></h2>
                 <p>
                   支持文字型
                   PDF、TXT、MD；可提取候选金额与日期，由你核对后记录事实状态。
@@ -783,16 +713,16 @@ onUnmounted(() => {
               <div class="settings-icon"><SlidersHorizontal :size="21" /></div>
               <div>
                 <h2>
-                  硅基流动 · 材料分析
+                  辅助材料分析
                   <span class="badge">{{
-                    settings.textReady ? "已配置" : "待配置"
+                    settings.textReady ? "可用" : "暂不可用"
                   }}</span>
                 </h2>
                 <p>
                   辅助检查合同、聊天及付款材料中的差异。分析结果保留原文引用，需要人工核对。
                 </p>
                 <div class="settings-detail">
-                  {{ settings.textModel || "尚未选择文本模型" }}
+                  使用前会说明发送范围，经你确认后才向外部分析服务发送材料。
                 </div>
               </div>
             </section>
@@ -800,37 +730,34 @@ onUnmounted(() => {
               <div class="settings-icon"><Search :size="21" /></div>
               <div>
                 <h2>
-                  硅基流动 · 图片文字识别
+                  图片文字识别
                   <span class="badge">{{
-                    settings.visionReady ? "已配置" : "待配置"
+                    settings.visionReady ? "可用" : "暂不可用"
                   }}</span>
                 </h2>
                 <p>
                   转录聊天截图、合同照片中的可见文字。识别后先核对，再保存进事项材料。
                 </p>
                 <div class="settings-detail">
-                  {{
-                    settings.visionModel || "尚未选择支持图片输入的多模态模型"
-                  }}
+                  识别暂不可用时，可以手动补充材料文字。
                 </div>
               </div>
             </section>
           </div>
           <div class="settings-footnote">
-            <h3>连接方式</h3>
+            <h3>保存与恢复记录</h3>
             <p>
-              在项目根目录的 <code>.env</code> 中填写 API
-              Key、文本模型和多模态模型名称，重启后端即可。密钥仅由后端读取。调用外部服务前，页面会提示发送的材料范围。
+              在每条记录的「事项报告」中导出完整备份，之后可在「我的记录」中恢复。完整备份包含原始材料且未加密，请妥善保管。
             </p>
             <p>
-              未配置时，争议清单、凭证关联、押金结算、人工核对与草稿导出均可正常使用。
+              当前尚无账号登录或跨设备自动同步。外部分析暂不可用时，材料整理、金额核对与报告导出仍可使用，无需你配置任何服务。
             </p>
           </div>
         </template>
         <footer>
-          <span>青盾 · 大学生权益工作台</span
+          <span>青盾 · 大学生权益助手</span
           ><span>材料整理与行动辅助，不替代专业法律意见</span
-          ><span>本地版本 0.3</span>
+          ><span>独立访客记录</span>
         </footer>
       </main>
     </div>
@@ -935,8 +862,7 @@ onUnmounted(() => {
           </li>
         </ol>
         <p class="muted">
-          本地功能不需要
-          API。外部模型分析和图片识别需要配置硅基流动服务。当前版本仅供本机使用，尚无线上账号与多人权限隔离。
+          无需注册即可使用，材料保存在服务器并按访客身份隔离。请保留当前浏览器的 Cookie，重要材料及时导出完整备份。外部分析前会征求你的确认，结果需要人工核实。
         </p>
         <button class="button dark wide" @click="help = false">知道了</button>
       </div>

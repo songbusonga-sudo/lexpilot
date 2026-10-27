@@ -50,6 +50,9 @@ test("model adapter validates exact quotes and never returns its API key", async
     ]);
     assert.equal(result.findings.length, 1);
     assert.equal(result.rejectedCount, 1);
+    assert.equal(result.coverage.materialCount, 1);
+    assert.equal(result.sourceFingerprint.length, 64);
+    await assert.rejects(() => analyzeWithModel({scene:'rental'}, [{id:'a',name:'超长材料',text:'文'.repeat(16001)}]), /16000/);
     global.fetch = async (url, options) => {
       const body = JSON.parse(options.body);
       assert.equal(body.model, "test/vision");
